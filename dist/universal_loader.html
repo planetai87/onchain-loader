@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnChain Loader</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        body {
+            background: #000;
+            color: #00ff41;
+            font-family: monospace;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        #status { font-size: 16px; margin-bottom: 10px; }
+        #progress { font-size: 12px; color: #00aa33; }
+        .error { color: #ff003c; }
+    </style>
+</head>
+<body>
+    <div id="status">Initializing...</div>
+    <div id="progress"></div>
+
+    <script>
+        // OnChainLoader Universal - v1.0.0
+        // Usage: ?master=0x...&rpc=https://...
+        // Or: ?config=base64encodedJSON
+
+        (async function() {
+            const status = document.getElementById('status');
+            const progress = document.getElementById('progress');
+
+            // Parse URL parameters
+            const params = new URLSearchParams(window.location.search);
+            
+            let config = {};
+            
+            // Method 1: Direct parameters
+            if (params.get('master') && params.get('rpc')) {
+                config = {
+                    masterAddress: params.get('master'),
+                    rpcUrl: params.get('rpc')
+                };
+            }
+            // Method 2: Base64 encoded config
+            else if (params.get('config')) {
+                try {
+                    config = JSON.parse(atob(params.get('config')));
+                } catch(e) {
+                    throw new Error('Invalid config parameter');
+                }
+            }
+            // Method 3: Hash-based config
+            else if (window.location.hash) {
+                try {
+                    config = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
+                } catch(e) {
+                    throw new Error('Invalid hash config');
+                }
+            }
+            else {
+                status.className = 'error';
+                status.textContent = 'Missing parameters!';
+                progress.innerHTML = `
+                    <br><br>Usage examples:<br>
+                    ?master=0xADDRESS&rpc=https://RPC_URL<br>
+                    <br>or<br>
+                    ?config=BASE64_ENCODED_JSON<br>
+                    <br>or<br>
+                    #{"masterAddress":"0x...","rpcUrl":"https://..."}
+                `;
+                return;
+            }
+
+            // Validate config
+            if (!config.masterAddress || !config.rpcUrl) {
+                throw new Error('masterAddress and rpcUrl required');
+            }
+
+            status.textContent = 'Connecting...';
+
+            try {
+                const MASTER_ABI = [
+                    "function currentVersion() external view returns (uint256)",
+                    "function getCurrentChunkCount() external view returns (uint256)",
+                    "function resolveCurrentChunk(uint256 index) external view returns (address)"
+                ];
+                const PAGE_ABI = ["function read() external view returns (string)"];
+
+                const provider = new ethers.JsonRpcProvider(config.rpcUrl);
+                const master = new ethers.Contract(config.masterAddress, MASTER_ABI, provider);
+
+                status.textContent = 'Reading chunks...';
+                const count = Number(await master.getCurrentChunkCount());
+                
+                if (count === 0) throw new Error('No data found');
+
+                let fullSource = "";
+                for (let i = 0; i < count; i++) {
+                    status.textContent = `Loading ${i + 1}/${count}...`;
+                    progress.textContent = `${Math.round((i + 1) / count * 100)}%`;
+                    
+                    const chunkAddr = await master.resolveCurrentChunk(i);
+                    const page = new ethers.Contract(chunkAddr, PAGE_ABI, provider);
+                    fullSource += await page.read();
+                }
+
+                status.textContent = 'Executing...';
+                setTimeout(() => {
+                    document.open();
+                    document.write(fullSource);
+                    document.close();
+                }, 200);
+
+            } catch (err) {
+                console.error(err);
+                status.className = 'error';
+                status.textContent = `Error: ${err.message}`;
+                progress.textContent = '';
+            }
+        })();
+    </script>
+</body>
+</html>
