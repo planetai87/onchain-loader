@@ -1,0 +1,20 @@
+{
+  "name": "onchain-loader",
+  "version": "1.0.0",
+  "description": "Load on-chain HTML from Megaeth contracts",
+  "main": "dist/onchain-loader.js",
+  "scripts": {
+    "build": "npm run copy && npm run minify",
+    "copy": "cp src/onchain-loader.js dist/onchain-loader.js",
+    "minify": "terser dist/onchain-loader.js -o dist/onchain-loader.min.js -c -m"
+  },
+  "keywords": ["Megaeth", "web3", "onchain"],
+  "author": "planetai",
+  "license": "MIT",
+  "devDependencies": {
+    "terser": "^5.19.0"
+  },
+  "dependencies": {
+    "ethers": "^6.7.0"
+  }
+}
