@@ -3,125 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OnChain Loader</title>
+    <title>MegaETH Loader (Stable)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         body {
             background: #000;
             color: #00ff41;
-            font-family: monospace;
+            font-family: 'Courier New', Courier, monospace;
             margin: 0;
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             flex-direction: column;
+            overflow: hidden;
         }
-        #status { font-size: 16px; margin-bottom: 10px; }
+        #status { font-size: 16px; margin-bottom: 15px; text-align: center; line-height: 1.5; }
         #progress { font-size: 12px; color: #00aa33; }
         .error { color: #ff003c; }
     </style>
 </head>
 <body>
-    <div id="status">Initializing...</div>
+    <div id="status">Connecting to MegaETH...</div>
     <div id="progress"></div>
 
     <script>
-        // OnChainLoader Universal - v1.0.0
-        // Usage: ?master=0x...&rpc=https://...
-        // Or: ?config=base64encodedJSON
-
         (async function() {
             const status = document.getElementById('status');
             const progress = document.getElementById('progress');
 
-            // Parse URL parameters
+            const DEFAULTS = { rpcUrl: "https://timothy.megaeth.com/rpc" };
             const params = new URLSearchParams(window.location.search);
-            
-            let config = {};
-            
-            // Method 1: Direct parameters
-            if (params.get('master') && params.get('rpc')) {
-                config = {
-                    masterAddress: params.get('master'),
-                    rpcUrl: params.get('rpc')
-                };
+            let config = { ...DEFAULTS };
+
+            // 설정 파싱 (기존과 동일)
+            if (params.get('master')) {
+                config.masterAddress = params.get('master');
+                if (params.get('rpc')) config.rpcUrl = params.get('rpc');
             }
-            // Method 2: Base64 encoded config
-            else if (params.get('config')) {
-                try {
-                    config = JSON.parse(atob(params.get('config')));
-                } catch(e) {
-                    throw new Error('Invalid config parameter');
-                }
-            }
-            // Method 3: Hash-based config
-            else if (window.location.hash) {
-                try {
-                    config = JSON.parse(decodeURIComponent(window.location.hash.slice(1)));
-                } catch(e) {
-                    throw new Error('Invalid hash config');
-                }
-            }
-            else {
+
+            if (!config.masterAddress) {
+                status.textContent = "Error: Master Address Required";
                 status.className = 'error';
-                status.textContent = 'Missing parameters!';
-                progress.innerHTML = `
-                    <br><br>Usage examples:<br>
-                    ?master=0xADDRESS&rpc=https://RPC_URL<br>
-                    <br>or<br>
-                    ?config=BASE64_ENCODED_JSON<br>
-                    <br>or<br>
-                    #{"masterAddress":"0x...","rpcUrl":"https://..."}
-                `;
                 return;
             }
 
-            // Validate config
-            if (!config.masterAddress || !config.rpcUrl) {
-                throw new Error('masterAddress and rpcUrl required');
-            }
-
-            status.textContent = 'Connecting...';
-
             try {
+                const provider = new ethers.JsonRpcProvider(config.rpcUrl);
                 const MASTER_ABI = [
-                    "function currentVersion() external view returns (uint256)",
                     "function getCurrentChunkCount() external view returns (uint256)",
                     "function resolveCurrentChunk(uint256 index) external view returns (address)"
                 ];
                 const PAGE_ABI = ["function read() external view returns (string)"];
-
-                const provider = new ethers.JsonRpcProvider(config.rpcUrl);
+                
                 const master = new ethers.Contract(config.masterAddress, MASTER_ABI, provider);
 
-                status.textContent = 'Reading chunks...';
+                // 1. 청크 개수 확인
                 const count = Number(await master.getCurrentChunkCount());
-                
-                if (count === 0) throw new Error('No data found');
+                if (count === 0) throw new Error('No content found');
 
+                status.textContent = `Loading ${count} chunks...`;
+                
+                // 2. [안정성 수정] 순차 다운로드 (Sequential Download)
+                // Promise.all 대신 for loop 사용으로 RPC 부하 방지
                 let fullSource = "";
                 for (let i = 0; i < count; i++) {
-                    status.textContent = `Loading ${i + 1}/${count}...`;
-                    progress.textContent = `${Math.round((i + 1) / count * 100)}%`;
+                    // 진행률 표시 업데이트
+                    const percent = Math.round(((i) / count) * 100);
+                    progress.textContent = `[${i + 1}/${count}] ${percent}%`;
                     
+                    // 주소 조회
                     const chunkAddr = await master.resolveCurrentChunk(i);
+                    // 데이터 읽기
                     const page = new ethers.Contract(chunkAddr, PAGE_ABI, provider);
-                    fullSource += await page.read();
+                    const chunkData = await page.read();
+                    
+                    fullSource += chunkData;
                 }
 
-                status.textContent = 'Executing...';
+                progress.textContent = "100% - Rendering...";
+
+                // 3. 렌더링
                 setTimeout(() => {
                     document.open();
                     document.write(fullSource);
                     document.close();
-                }, 200);
+                }, 100);
 
             } catch (err) {
                 console.error(err);
                 status.className = 'error';
-                status.textContent = `Error: ${err.message}`;
-                progress.textContent = '';
+                status.textContent = `Load Error: ${err.message}`;
+                
+                // 힌트 메시지 추가
+                if (err.code === 'CALL_EXCEPTION') {
+                    progress.innerHTML = "<br>RPC Connection Failed or Empty Contract.<br>Try refreshing.";
+                }
             }
         })();
     </script>
