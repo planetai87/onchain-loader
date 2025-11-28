@@ -92,7 +92,7 @@ For developers who want more control:
 <html>
 <head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/planetai87/onchain-loader/dist/onchain-loader.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/planetai87/onchain-loader/dist/onchain_loader.js"></script>
 </head>
 <body>
     <script>
