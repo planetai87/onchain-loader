@@ -27,10 +27,8 @@ https://planetai87.github.io/onchain-loader/dist/loader.html?master=YOUR_CONTRAC
 
 ### Example
 
-```
-https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x7c57f2A97D075fd61bE15a112E5294492DBB6079&rpc=https://timothy.megaeth.com/rpc
-https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x3A640e0139f0c389Da72a8d2BA49F108cE3387D4&rpc=https://timothy.megaeth.com/rpc
-```
+- [Live Demo 1](https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x7c57f2A97D075fd61bE15a112E5294492DBB6079&rpc=https://timothy.megaeth.com/rpc)
+- [Live Demo 2](https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x3A640e0139f0c389Da72a8d2BA49F108cE3387D4&rpc=https://timothy.megaeth.com/rpc)
 
 ## 📖 How It Works
 
@@ -194,15 +192,11 @@ OnChainLoader.load({
 ## 🚀 CDN Links
 
 ### Loader Page
-```
-https://cdn.jsdelivr.net/gh/planetai87/onchain-loader/dist/loader.html
-https://planetai87.github.io/onchain-loader/dist/loader.html
-```
+- [jsDelivr CDN](https://cdn.jsdelivr.net/gh/planetai87/onchain-loader/dist/loader.html)
+- [GitHub Pages](https://planetai87.github.io/onchain-loader/dist/loader.html)
 
 ### JavaScript Library
-```
-https://cdn.jsdelivr.net/gh/planetai87/onchain-loader/dist/onchain-loader.js
-```
+- [jsDelivr CDN](https://cdn.jsdelivr.net/gh/planetai87/onchain-loader/dist/onchain-loader.js)
 
 ## 📦 Project Structure
 
