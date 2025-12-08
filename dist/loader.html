@@ -3,104 +3,473 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MegaETH Loader (Stable)</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <title>OnChain Loader</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             background: #000;
             color: #00ff41;
             font-family: 'Courier New', Courier, monospace;
-            margin: 0;
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             flex-direction: column;
-            overflow: hidden;
         }
-        #status { font-size: 16px; margin-bottom: 15px; text-align: center; line-height: 1.5; }
-        #progress { font-size: 12px; color: #00aa33; }
-        .error { color: #ff003c; }
+        #loader-container {
+            text-align: center;
+            padding: 40px;
+            max-width: 500px;
+        }
+        .title {
+            font-size: 14px;
+            letter-spacing: 2px;
+            color: rgba(0, 255, 65, 0.6);
+            margin-bottom: 30px;
+        }
+        #status {
+            font-size: 16px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        #progress {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        #phase {
+            font-size: 12px;
+            color: rgba(0, 255, 65, 0.7);
+            margin-bottom: 15px;
+        }
+        #details {
+            font-size: 11px;
+            color: rgba(0, 255, 65, 0.5);
+        }
+        .error {
+            color: #ff003c;
+        }
+        #content-frame {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+            z-index: 1000;
+            display: none;
+        }
     </style>
 </head>
 <body>
-    <div id="status">Connecting to MegaETH...</div>
-    <div id="progress"></div>
+    <div id="loader-container">
+        <div class="title">ONCHAIN LOADER v2</div>
+        <div id="status">Connecting...</div>
+        <div id="progress"></div>
+        <div id="phase"></div>
+        <div id="details"></div>
+    </div>
+    <iframe id="content-frame"></iframe>
 
-    <script>
-        (async function() {
-            const status = document.getElementById('status');
-            const progress = document.getElementById('progress');
+    <script type="module">
+        import { createPublicClient, http, hexToBytes, toHex } from "https://esm.sh/viem@2.21.0";
 
-            const DEFAULTS = { rpcUrl: "https://timothy.megaeth.com/rpc" };
+        // Configuration
+        const RPC_URL = "https://timothy.megaeth.com/rpc";
+        const CHUNK_SIZE = 3000;
+
+        // ABIs for tree structure (v2)
+        const masterAbiV2 = [
+            {
+                name: 'getCurrentSiteInfo',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [],
+                outputs: [{
+                    type: 'tuple',
+                    components: [
+                        { name: 'rootChunk', type: 'address' },
+                        { name: 'depth', type: 'uint8' },
+                        { name: 'totalSize', type: 'uint256' }
+                    ]
+                }]
+            }
+        ];
+
+        // ABIs for flat structure (v1 legacy)
+        const masterAbiV1 = [
+            {
+                name: 'getCurrentChunkCount',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [],
+                outputs: [{ type: 'uint256' }]
+            },
+            {
+                name: 'resolveCurrentChunk',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [{ type: 'uint256', name: 'index' }],
+                outputs: [{ type: 'address' }]
+            }
+        ];
+
+        const pageAbi = [
+            {
+                name: 'read',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [],
+                outputs: [{ type: 'bytes' }]
+            }
+        ];
+
+        // Legacy page ABI (returns string)
+        const pageAbiLegacy = [
+            {
+                name: 'read',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [],
+                outputs: [{ type: 'string' }]
+            }
+        ];
+
+        // DOM Elements
+        const loaderContainer = document.getElementById('loader-container');
+        const contentFrame = document.getElementById('content-frame');
+        const statusEl = document.getElementById('status');
+        const progressEl = document.getElementById('progress');
+        const phaseEl = document.getElementById('phase');
+        const detailsEl = document.getElementById('details');
+
+        // State
+        let scannedChunks = 0;
+        let loadedChunks = 0;
+        let bytesLoaded = 0;
+        let expectedTotal = 0;
+
+        // Utility functions
+        function setStatus(msg) {
+            if (statusEl) statusEl.textContent = msg;
+        }
+
+        function setProgress(current, total) {
+            if (progressEl && total > 0) {
+                const percent = Math.round((current / total) * 100);
+                progressEl.textContent = `${percent}%`;
+            }
+        }
+
+        function setPhase(phase) {
+            if (phaseEl) phaseEl.textContent = phase;
+        }
+
+        function setDetails(text) {
+            if (detailsEl) detailsEl.textContent = text;
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function showError(msg) {
+            if (statusEl) {
+                statusEl.className = 'error';
+                statusEl.textContent = msg;
+            }
+            if (progressEl) progressEl.textContent = '';
+            if (phaseEl) phaseEl.textContent = '';
+        }
+
+        // Get RPC URL from params or use default
+        function getRpcUrl() {
             const params = new URLSearchParams(window.location.search);
-            let config = { ...DEFAULTS };
+            return params.get('rpc') || RPC_URL;
+        }
 
-            // 설정 파싱 (기존과 동일)
-            if (params.get('master')) {
-                config.masterAddress = params.get('master');
-                if (params.get('rpc')) config.rpcUrl = params.get('rpc');
+        // Create viem client
+        function createClient() {
+            return createPublicClient({
+                transport: http(getRpcUrl())
+            });
+        }
+
+        // Fetch chunk data with retry
+        async function fetchChunkData(client, address, retries = 3) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const data = await client.readContract({
+                        address,
+                        abi: pageAbi,
+                        functionName: 'read'
+                    });
+                    return hexToBytes(data);
+                } catch (err) {
+                    if (i === retries - 1) throw err;
+                    const delay = 200 * Math.pow(2, i);
+                    await new Promise(r => setTimeout(r, Math.min(delay, 2000)));
+                }
+            }
+        }
+
+        // V2: Collect all leaf addresses from tree structure
+        async function collectLeafAddresses(client, rootChunk, depth) {
+            const leaves = [];
+
+            async function traverseNode(address, nodeDepth) {
+                if (nodeDepth === 0) {
+                    leaves.push(address);
+                    scannedChunks++;
+                    setStatus(`Scanning: ${scannedChunks} chunks found`);
+                    return;
+                }
+
+                try {
+                    const data = await fetchChunkData(client, address, 3);
+                    const childAddrs = [];
+                    for (let i = 0; i < data.length; i += 20) {
+                        childAddrs.push(toHex(data.slice(i, i + 20)));
+                    }
+                    setPhase(`Depth ${nodeDepth}: ${childAddrs.length} nodes`);
+
+                    for (const childAddr of childAddrs) {
+                        await traverseNode(childAddr, nodeDepth - 1);
+                    }
+                } catch (err) {
+                    throw new Error(`Failed to traverse tree: ${err.message}`);
+                }
             }
 
-            if (!config.masterAddress) {
-                status.textContent = "Error: Master Address Required";
-                status.className = 'error';
+            await traverseNode(rootChunk, depth);
+            return leaves;
+        }
+
+        // V2: Load chunks sequentially
+        async function loadChunksV2(client, leaves) {
+            const chunks = [];
+            const failed = [];
+
+            for (let i = 0; i < leaves.length; i++) {
+                setStatus(`Loading: ${i + 1} / ${leaves.length}`);
+                setProgress(i + 1, leaves.length);
+
+                try {
+                    const data = await fetchChunkData(client, leaves[i], 2);
+                    chunks.push({ index: i, data });
+                    bytesLoaded += data.length;
+                    setDetails(`${formatBytes(bytesLoaded)} loaded`);
+                } catch (err) {
+                    failed.push({ index: i, address: leaves[i] });
+                }
+            }
+
+            return { chunks, failed };
+        }
+
+        // V2: Retry failed chunks
+        async function retryFailedChunks(client, failed, chunks) {
+            if (failed.length === 0) return;
+
+            let toRetry = [...failed];
+            let retryRound = 0;
+
+            while (toRetry.length > 0 && retryRound < 5) {
+                retryRound++;
+                const stillFailed = [];
+                setPhase(`Retry ${retryRound}: ${toRetry.length} chunks`);
+
+                await new Promise(r => setTimeout(r, 500 * retryRound));
+
+                for (const item of toRetry) {
+                    setStatus(`Retrying chunk ${item.index + 1}...`);
+                    try {
+                        const data = await fetchChunkData(client, item.address, 3);
+                        chunks.push({ index: item.index, data });
+                        bytesLoaded += data.length;
+                        loadedChunks++;
+                        setProgress(loadedChunks, expectedTotal);
+                    } catch (err) {
+                        stillFailed.push(item);
+                    }
+                    await new Promise(r => setTimeout(r, 100));
+                }
+                toRetry = stillFailed;
+            }
+
+            if (toRetry.length > 0) {
+                console.warn(`${toRetry.length} chunks permanently failed`);
+            }
+        }
+
+        // V2: Main loader for tree structure
+        async function loadV2(client, masterAddress) {
+            setPhase('Reading contract info...');
+
+            const info = await client.readContract({
+                address: masterAddress,
+                abi: masterAbiV2,
+                functionName: 'getCurrentSiteInfo'
+            });
+
+            const { rootChunk, depth, totalSize } = info;
+            expectedTotal = Math.ceil(Number(totalSize) / CHUNK_SIZE);
+            setDetails(`Total size: ${formatBytes(Number(totalSize))}`);
+
+            // Phase 1: Scan tree structure
+            setStatus('Scanning tree structure...');
+            setPhase('Phase 1: Scanning');
+            const leaves = await collectLeafAddresses(client, rootChunk, Number(depth));
+            expectedTotal = leaves.length;
+
+            // Phase 2: Load chunks
+            setPhase('Phase 2: Loading');
+            const { chunks, failed } = await loadChunksV2(client, leaves);
+            loadedChunks = chunks.length;
+
+            // Phase 3: Retry failed
+            if (failed.length > 0) {
+                setPhase('Phase 3: Retrying');
+                await retryFailedChunks(client, failed, chunks);
+            }
+
+            // Assemble data
+            chunks.sort((a, b) => a.index - b.index);
+            const totalBytes = chunks.reduce((sum, c) => sum + c.data.length, 0);
+            const finalData = new Uint8Array(totalBytes);
+
+            let offset = 0;
+            for (const chunk of chunks) {
+                finalData.set(chunk.data, offset);
+                offset += chunk.data.length;
+            }
+
+            return finalData;
+        }
+
+        // V1: Legacy loader for flat structure
+        async function loadV1(client, masterAddress) {
+            setPhase('Reading chunk count...');
+
+            const count = await client.readContract({
+                address: masterAddress,
+                abi: masterAbiV1,
+                functionName: 'getCurrentChunkCount'
+            });
+
+            const chunkCount = Number(count);
+            if (chunkCount === 0) throw new Error('No content found');
+
+            expectedTotal = chunkCount;
+            let fullSource = "";
+
+            for (let i = 0; i < chunkCount; i++) {
+                setStatus(`Loading: ${i + 1} / ${chunkCount}`);
+                setProgress(i + 1, chunkCount);
+
+                const chunkAddr = await client.readContract({
+                    address: masterAddress,
+                    abi: masterAbiV1,
+                    functionName: 'resolveCurrentChunk',
+                    args: [BigInt(i)]
+                });
+
+                const chunkData = await client.readContract({
+                    address: chunkAddr,
+                    abi: pageAbiLegacy,
+                    functionName: 'read'
+                });
+
+                fullSource += chunkData;
+                bytesLoaded += chunkData.length;
+                setDetails(`${formatBytes(bytesLoaded)} loaded`);
+            }
+
+            return new TextEncoder().encode(fullSource);
+        }
+
+        // Detect contract version and load accordingly
+        async function detectAndLoad(client, masterAddress) {
+            // Try V2 first (tree structure)
+            try {
+                await client.readContract({
+                    address: masterAddress,
+                    abi: masterAbiV2,
+                    functionName: 'getCurrentSiteInfo'
+                });
+                setPhase('Detected: Tree structure (v2)');
+                return await loadV2(client, masterAddress);
+            } catch (e) {
+                // Fall back to V1 (flat structure)
+                try {
+                    await client.readContract({
+                        address: masterAddress,
+                        abi: masterAbiV1,
+                        functionName: 'getCurrentChunkCount'
+                    });
+                    setPhase('Detected: Flat structure (v1)');
+                    return await loadV1(client, masterAddress);
+                } catch (e2) {
+                    throw new Error('Contract does not match v1 or v2 interface');
+                }
+            }
+        }
+
+        // Render content
+        function renderContent(data) {
+            setStatus('Rendering...');
+            setPhase('Complete');
+
+            // Encoding detection
+            const asciiPreview = new TextDecoder('ascii', { fatal: false }).decode(data.slice(0, 2000));
+            const charsetMatch = asciiPreview.match(/charset=["']?(euc-kr|cp949|ks_c_5601-1987)/i);
+
+            let htmlString;
+            if (charsetMatch) {
+                htmlString = new TextDecoder('euc-kr').decode(data);
+            } else {
+                htmlString = new TextDecoder('utf-8').decode(data);
+            }
+
+            loaderContainer.style.display = 'none';
+            contentFrame.style.display = 'block';
+            contentFrame.srcdoc = htmlString;
+        }
+
+        // Main initialization
+        async function init() {
+            const params = new URLSearchParams(window.location.search);
+            const masterAddress = params.get('master');
+
+            if (!masterAddress) {
+                showError('Error: master address required');
+                setDetails('Usage: ?master=0x... or ?master=0x...&rpc=https://...');
                 return;
             }
 
             try {
-                const provider = new ethers.JsonRpcProvider(config.rpcUrl);
-                const MASTER_ABI = [
-                    "function getCurrentChunkCount() external view returns (uint256)",
-                    "function resolveCurrentChunk(uint256 index) external view returns (address)"
-                ];
-                const PAGE_ABI = ["function read() external view returns (string)"];
-                
-                const master = new ethers.Contract(config.masterAddress, MASTER_ABI, provider);
+                const client = createClient();
+                setStatus('Connecting...');
 
-                // 1. 청크 개수 확인
-                const count = Number(await master.getCurrentChunkCount());
-                if (count === 0) throw new Error('No content found');
-
-                status.textContent = `Loading ${count} chunks...`;
-                
-                // 2. [안정성 수정] 순차 다운로드 (Sequential Download)
-                // Promise.all 대신 for loop 사용으로 RPC 부하 방지
-                let fullSource = "";
-                for (let i = 0; i < count; i++) {
-                    // 진행률 표시 업데이트
-                    const percent = Math.round(((i) / count) * 100);
-                    progress.textContent = `[${i + 1}/${count}] ${percent}%`;
-                    
-                    // 주소 조회
-                    const chunkAddr = await master.resolveCurrentChunk(i);
-                    // 데이터 읽기
-                    const page = new ethers.Contract(chunkAddr, PAGE_ABI, provider);
-                    const chunkData = await page.read();
-                    
-                    fullSource += chunkData;
-                }
-
-                progress.textContent = "100% - Rendering...";
-
-                // 3. 렌더링
-                setTimeout(() => {
-                    document.open();
-                    document.write(fullSource);
-                    document.close();
-                }, 100);
+                const data = await detectAndLoad(client, masterAddress);
+                renderContent(data);
 
             } catch (err) {
                 console.error(err);
-                status.className = 'error';
-                status.textContent = `Load Error: ${err.message}`;
-                
-                // 힌트 메시지 추가
-                if (err.code === 'CALL_EXCEPTION') {
-                    progress.innerHTML = "<br>RPC Connection Failed or Empty Contract.<br>Try refreshing.";
-                }
+                showError(`Error: ${err.message}`);
             }
-        })();
+        }
+
+        init();
     </script>
 </body>
 </html>
