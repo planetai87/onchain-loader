@@ -1,271 +1,202 @@
-# MegaETH OnChain Loader
+# OnChain Loader
 
-> Load HTML content directly from MegaETH smart contracts with a single URL
+> Permanent on-chain content loader for MegaETH blockchain
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MegaETH](https://img.shields.io/badge/Chain-MegaETH-blue)](https://megaeth.com)
-[![GitHub Pages](https://img.shields.io/badge/demo-live-brightgreen)](https://planetai87.github.io/onchain-loader/examples/demo.html)
 
-## ✨ Why MegaETH?
+## Why This Exists
 
-MegaETH is the world's first real-time blockchain, offering:
+This loader was created as part of the **MEGA_WARREN** project to ensure that on-chain content stored on MegaETH remains **permanently accessible** - even after the original project ends.
 
-- ⚡ **Real-time Performance** - Sub-millisecond block times
-- 💰 **Ultra-low Gas Fees** - Store large HTML files on-chain affordably
-- 🚀 **High Throughput** - Perfect for on-chain web applications
-- 🌐 **EVM Compatible** - Works with standard Ethereum tools
+**Key Principle**: Data stored on-chain lives forever. This loader ensures you can always read it.
 
-OnChain Loader leverages MegaETH's speed to deliver instant on-chain content loading.
+When content is deployed to the blockchain, it becomes immutable and permanent. This open-source loader guarantees that anyone can retrieve and display this content at any time, without depending on any centralized service.
 
-## 🎯 Quick Start
+## Features
 
-### Use it right now (no installation):
+- **V2 Tree Structure**: Efficient loading of large content via tree-structured contracts
+- **V1 Legacy Support**: Backward compatible with flat chunk structure
+- **Auto-Detection**: Automatically detects contract version (v1/v2)
+- **Encoding Support**: Handles UTF-8 and EUC-KR encoded content
+- **Retry Logic**: Built-in retry mechanism for network reliability
+- **Simple UI**: Minimal, distraction-free loading interface
 
-```
-https://planetai87.github.io/onchain-loader/dist/loader.html?master=YOUR_CONTRACT
-```
+## Quick Start
 
-### Example
-
-- [Live Demo 1](https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x7c57f2A97D075fd61bE15a112E5294492DBB6079&rpc=https://timothy.megaeth.com/rpc)
-- [Live Demo 2](https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x3A640e0139f0c389Da72a8d2BA49F108cE3387D4&rpc=https://timothy.megaeth.com/rpc)
-
-## 📖 How It Works
-
-OnChain Loader fetches HTML content stored across multiple MegaETH smart contracts and renders it instantly in your browser. 
-
-Thanks to MegaETH's real-time performance:
-- 🚀 Lightning-fast chunk retrieval
-- ⚡ Near-instant page loading
-- 💰 Affordable on-chain storage costs
-
-Perfect for:
-- 📄 Fully on-chain websites
-- 🎨 NFT metadata and dynamic art
-- 📚 Decentralized documentation
-- 🎮 On-chain games and interactive apps
-
-## 🔧 Usage Methods
-
-### Method 1: Direct URL (Recommended)
-
-Simply add your MegaETH contract address:
+### Direct URL (Recommended)
 
 ```
-?master=0xYOUR_CONTRACT_ADDRESS&rpc=https://timothy.megaeth.com/rpc
+https://[your-host]/dist/loader.html?master=0xYOUR_CONTRACT_ADDRESS
 ```
 
-**Example:**
-```html
-<a href="https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x123...&rpc=https://timothy.megaeth.com/rpc">
-  View On-Chain Content
-</a>
+With custom RPC:
+```
+https://[your-host]/dist/loader.html?master=0x...&rpc=https://timothy.megaeth.com/rpc
 ```
 
-### Method 2: Hash Configuration
-
-Pass configuration in URL hash:
+### GitHub Pages
 
 ```
-#{"masterAddress":"0x...","rpcUrl":"https://timothy.megaeth.com/rpc"}
+https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x...
 ```
 
-### Method 3: Base64 Config
+## Contract Structures
 
-Encode your config and pass it:
+### V2 Tree Structure (Current)
 
-```javascript
-const config = {
-  masterAddress: "0x...",
-  rpcUrl: "https://timothy.megaeth.com/rpc"
-};
-const encoded = btoa(JSON.stringify(config));
-// Use: ?config=BASE64_STRING
-```
-
-### Method 4: JavaScript Library
-
-For developers who want more control:
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/planetai87/onchain-loader/dist/onchain_loader.js"></script>
-</head>
-<body>
-    <script>
-        OnChainLoader.load({
-            masterAddress: "0x7c57f2A97D075fd61bE15a112E5294492DBB6079",
-            rpcUrl: "https://timothy.megaeth.com/rpc",
-            onProgress: (current, total) => {
-                console.log(`Loading: ${current}/${total}`);
-            }
-        });
-    </script>
-</body>
-</html>
-```
-
-## 🏗️ Smart Contract Interface
-
-Deploy your contracts on MegaETH with these interfaces:
-
-### Master Contract
+The v2 structure uses a tree hierarchy for efficient storage and retrieval of large content.
 
 ```solidity
-interface IMasterContract {
-    function getCurrentChunkCount() external view returns (uint256);
-    function resolveCurrentChunk(uint256 index) external view returns (address);
+// Master Contract
+interface IMasterV2 {
+    struct SiteInfo {
+        address rootChunk;  // Root of the tree
+        uint8 depth;        // Tree depth
+        uint256 totalSize;  // Total content size in bytes
+    }
+    function getCurrentSiteInfo() external view returns (SiteInfo memory);
+}
+
+// Chunk Contract (leaf nodes contain data, non-leaf nodes contain child addresses)
+interface IChunk {
+    function read() external view returns (bytes memory);
 }
 ```
 
-### Chunk Contract
+### V1 Flat Structure (Legacy)
+
+The v1 structure uses a simple indexed array of chunks.
 
 ```solidity
-interface IChunkContract {
+// Master Contract
+interface IMasterV1 {
+    function getCurrentChunkCount() external view returns (uint256);
+    function resolveCurrentChunk(uint256 index) external view returns (address);
+}
+
+// Chunk Contract
+interface IChunkV1 {
     function read() external view returns (string memory);
 }
 ```
 
-## ⚡ MegaETH Network Info
+## JavaScript Library
 
-- **RPC Endpoint**: `https://timothy.megaeth.com/rpc`
-- **Chain Name**: MegaETH Timothy Testnet
-- **Performance**: Real-time, sub-millisecond blocks
-- **Gas**: Ultra-low fees for on-chain storage
+### V2 Loader (Tree Structure)
 
-## 📝 API Reference
-
-### OnChainLoader.load(config)
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `masterAddress` | string | ✅ | - | Master contract address on MegaETH |
-| `rpcUrl` | string | ✅ | - | MegaETH RPC endpoint |
-| `masterABI` | Array | ❌ | Default ABI | Custom master contract ABI |
-| `pageABI` | Array | ❌ | Default ABI | Custom page contract ABI |
-| `onProgress` | Function | ❌ | null | Progress callback `(current, total) => {}` |
-| `onError` | Function | ❌ | null | Error callback `(error) => {}` |
-| `showStatus` | boolean | ❌ | true | Show loading status |
-
-## 🎨 Examples
-
-### Basic Usage
-```
-https://planetai87.github.io/onchain-loader/dist/loader.html?master=0xYOUR_ADDRESS&rpc=https://timothy.megaeth.com/rpc
-```
-
-### Embed in iframe
 ```html
-<iframe 
-  src="https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x...&rpc=https://timothy.megaeth.com/rpc"
-  width="100%" 
-  height="600">
-</iframe>
-```
+<script type="module">
+  import { createPublicClient, http, hexToBytes, toHex } from "https://esm.sh/viem@2.21.0";
+  import { OnChainLoaderV2 } from "./onchain_loader.js";
 
-### Custom Error Handling
-```javascript
-OnChainLoader.load({
+  await OnChainLoaderV2.load({
     masterAddress: "0x...",
     rpcUrl: "https://timothy.megaeth.com/rpc",
-    onError: (err) => {
-        alert(`Failed to load: ${err.message}`);
+    viem: { createPublicClient, http, hexToBytes, toHex },
+    onProgress: (phase, current, total) => {
+      console.log(`${phase}: ${current}/${total || '?'}`);
     }
-});
+  });
+</script>
 ```
 
-### Progress Tracking
-```javascript
-OnChainLoader.load({
+### V1 Loader (Flat Structure)
+
+```html
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<script src="onchain_loader.js"></script>
+<script>
+  OnChainLoader.load({
     masterAddress: "0x...",
     rpcUrl: "https://timothy.megaeth.com/rpc",
     onProgress: (current, total) => {
-        const percent = Math.round((current / total) * 100);
-        console.log(`Loading: ${percent}%`);
+      console.log(`Loading: ${current}/${total}`);
     }
-});
+  });
+</script>
 ```
 
-## 🚀 CDN Links
+## API Reference
 
-### Loader Page
-- [jsDelivr CDN](https://cdn.jsdelivr.net/gh/planetai87/onchain-loader/dist/loader.html)
-- [GitHub Pages](https://planetai87.github.io/onchain-loader/dist/loader.html)
+### OnChainLoaderV2.load(config)
 
-### JavaScript Library
-- [jsDelivr CDN](https://cdn.jsdelivr.net/gh/planetai87/onchain-loader/dist/onchain-loader.js)
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `masterAddress` | string | Yes | Master contract address |
+| `rpcUrl` | string | Yes | RPC endpoint URL |
+| `viem` | object | Yes | viem module with required functions |
+| `onProgress` | function | No | Progress callback `(phase, current, total)` |
+| `onError` | function | No | Error callback `(error)` |
+| `showStatus` | boolean | No | Show loading status (default: true) |
 
-## 📦 Project Structure
+### OnChainLoaderV2.getData(config)
+
+Returns raw `Uint8Array` data without rendering. Useful for processing content programmatically.
+
+### OnChainLoader.load(config) - V1 Legacy
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `masterAddress` | string | Yes | Master contract address |
+| `rpcUrl` | string | Yes | RPC endpoint URL |
+| `masterABI` | array | No | Custom master contract ABI |
+| `pageABI` | array | No | Custom page contract ABI |
+| `onProgress` | function | No | Progress callback `(current, total)` |
+| `onError` | function | No | Error callback `(error)` |
+| `showStatus` | boolean | No | Show loading status (default: true) |
+
+## Project Structure
 
 ```
 onchain-loader/
 ├── dist/
-│   ├── loader.html              # Universal loader (use this!)
-│   └── onchain-loader.js        # JavaScript library
+│   ├── loader.html           # Universal loader (auto-detects v1/v2)
+│   └── onchain_loader.js     # JavaScript library
 ├── examples/
-│   └── demo.html                # Demo page
+│   ├── demo.html
+│   └── loader.html
+├── src/
+│   └── onchain_loader_lib.js
 ├── README.md
 └── LICENSE
 ```
 
-## 🛠️ Development
+## Network Info
 
-### Clone Repository
-```bash
-git clone https://github.com/planetai87/onchain-loader.git
-cd onchain-loader
-```
+- **RPC Endpoint**: `https://timothy.megaeth.com/rpc`
+- **Chain**: MegaETH Timothy Testnet
 
-### Local Testing
-Simply open `dist/loader.html` in a browser with URL parameters.
+## Self-Hosting
 
-### Deploy Your Own
-1. Fork this repository
-2. Enable GitHub Pages in Settings
-3. Use your own URL: `https://yourusername.github.io/onchain-loader/dist/loader.html`
+1. Clone or download this repository
+2. Host the `dist/` folder on any static web server
+3. Access via: `https://your-host/dist/loader.html?master=0x...`
 
-## 🤝 Contributing
+Alternatively, use services like:
+- GitHub Pages
+- Netlify
+- Vercel
+- IPFS
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## The Promise of On-Chain Data
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+Content deployed to blockchain is:
 
-## 🌟 Use Cases on MegaETH
+- **Immutable**: Cannot be modified or deleted
+- **Permanent**: Exists as long as the blockchain exists
+- **Accessible**: Anyone can read it with the right tools
 
-- **On-Chain Websites**: Host entire websites on MegaETH with instant loading
-- **NFT Galleries**: Dynamic, interactive NFT experiences stored fully on-chain
-- **Documentation**: Decentralized docs that load in real-time
-- **Games**: On-chain game clients with sub-millisecond response times
-- **DApps**: Full-featured decentralized applications with no off-chain dependencies
+This loader is that tool. Keep a copy, host it yourself, or use any public instance. Your on-chain content will always be readable.
 
-## 📄 License
+## Contributing
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Contributions are welcome. Please submit pull requests for any improvements.
 
-## 🙏 Acknowledgments
+## License
 
-- Built with [ethers.js](https://ethers.org/)
-- Powered by [MegaETH](https://megaeth.com)
-- Inspired by the fully on-chain movement
-
-## 📞 Support
-
-- 🐛 [Report Issues](https://github.com/planetai87/onchain-loader/issues)
-- 💡 [Request Features](https://github.com/planetai87/onchain-loader/issues/new)
-- 📖 [Documentation](https://github.com/planetai87/onchain-loader)
-- 🌐 [MegaETH Docs](https://docs.megaeth.com)
-
-## 🌟 Show Your Support
-
-Give a ⭐️ if this project helped you build on MegaETH!
+MIT License - See [LICENSE](LICENSE) for details.
 
 ---
 
-Made with ❤️ for MegaETH and the decentralized web
+Built for permanence. Data on-chain lives forever.
