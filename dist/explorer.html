@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnChain Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #020202;
+            color: #00ff41;
+            font-family: 'Courier New', Courier, monospace;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 40px 0 30px;
+            border-bottom: 1px solid rgba(0, 255, 65, 0.2);
+            margin-bottom: 30px;
+        }
+        .title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+        .subtitle {
+            font-size: 12px;
+            color: rgba(0, 255, 65, 0.6);
+            letter-spacing: 1px;
+        }
+        .search-section {
+            background: rgba(0, 255, 65, 0.05);
+            border: 1px solid rgba(0, 255, 65, 0.3);
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .search-label {
+            display: block;
+            font-size: 12px;
+            color: rgba(0, 255, 65, 0.7);
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        .search-input-group {
+            display: flex;
+            gap: 10px;
+        }
+        .search-input {
+            flex: 1;
+            background: #000;
+            border: 1px solid rgba(0, 255, 65, 0.5);
+            color: #00ff41;
+            padding: 12px 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border-radius: 4px;
+            outline: none;
+        }
+        .search-input:focus {
+            border-color: #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+        .search-input::placeholder {
+            color: rgba(0, 255, 65, 0.3);
+        }
+        .search-btn {
+            background: rgba(0, 255, 65, 0.2);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            padding: 12px 25px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            letter-spacing: 1px;
+        }
+        .search-btn:hover:not(:disabled) {
+            background: #00ff41;
+            color: #000;
+        }
+        .search-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 65, 0.2);
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stat-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff41;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .status-area {
+            text-align: center;
+            padding: 40px 20px;
+            color: rgba(0, 255, 65, 0.7);
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(0, 255, 65, 0.2);
+            border-top-color: #00ff41;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .sites-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        .site-card {
+            display: block;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 65, 0.3);
+            padding: 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .site-card:hover {
+            border-color: #00ff41;
+            background: rgba(0, 255, 65, 0.1);
+            transform: translateY(-2px);
+        }
+        .site-token {
+            font-size: 10px;
+            color: rgba(0, 255, 65, 0.5);
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+        .site-address {
+            font-size: 13px;
+            color: #fff;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+        .site-link-icon {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 12px;
+            font-size: 11px;
+            color: rgba(0, 255, 65, 0.6);
+        }
+        .site-card:hover .site-link-icon {
+            color: #00ff41;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            border: 2px dashed rgba(0, 255, 65, 0.2);
+            border-radius: 8px;
+        }
+        .empty-title {
+            font-size: 16px;
+            color: rgba(0, 255, 65, 0.7);
+            margin-bottom: 10px;
+        }
+        .empty-subtitle {
+            font-size: 12px;
+            color: rgba(0, 255, 65, 0.4);
+        }
+        .error-message {
+            color: #ff003c;
+            text-align: center;
+            padding: 20px;
+        }
+        .config-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(0, 255, 65, 0.1);
+        }
+        .config-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 11px;
+        }
+        .config-label {
+            color: rgba(0, 255, 65, 0.5);
+            white-space: nowrap;
+        }
+        .config-input {
+            flex: 1;
+            background: #000;
+            border: 1px solid rgba(0, 255, 65, 0.3);
+            color: #00ff41;
+            padding: 6px 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            border-radius: 3px;
+            outline: none;
+        }
+        .config-input:focus {
+            border-color: rgba(0, 255, 65, 0.6);
+        }
+        .footer {
+            text-align: center;
+            padding: 30px 0;
+            margin-top: 40px;
+            border-top: 1px solid rgba(0, 255, 65, 0.1);
+            font-size: 11px;
+            color: rgba(0, 255, 65, 0.4);
+        }
+        .footer a {
+            color: rgba(0, 255, 65, 0.6);
+            text-decoration: none;
+        }
+        .footer a:hover {
+            color: #00ff41;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">ONCHAIN EXPLORER</div>
+            <div class="subtitle">SEARCH DEPLOYED SITES BY WALLET ADDRESS</div>
+        </div>
+
+        <div class="search-section">
+            <label class="search-label">WALLET ADDRESS</label>
+            <div class="search-input-group">
+                <input
+                    type="text"
+                    id="wallet-input"
+                    class="search-input"
+                    placeholder="0x..."
+                >
+                <button id="search-btn" class="search-btn">SEARCH</button>
+            </div>
+            <div class="config-section">
+                <div class="config-row">
+                    <span class="config-label">NFT CONTRACT:</span>
+                    <input
+                        type="text"
+                        id="nft-contract-input"
+                        class="config-input"
+                        value="0xd1591a060BB8933869b16A248C77d1375389842B"
+                    >
+                </div>
+                <div class="config-row" style="margin-top: 8px;">
+                    <span class="config-label">RPC URL:</span>
+                    <input
+                        type="text"
+                        id="rpc-input"
+                        class="config-input"
+                        value="https://timothy.megaeth.com/rpc"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <div id="stats-bar" class="stats-bar" style="display: none;">
+            <div class="stat-item">
+                <span class="stat-dot"></span>
+                <span>ONCHAIN EXPLORER</span>
+            </div>
+            <div class="stat-item">
+                <span>OWNER: <span id="owner-address" style="color: #fff;">-</span></span>
+            </div>
+            <div class="stat-item">
+                <span>SITES: <span id="site-count" style="color: #fff;">0</span></span>
+            </div>
+        </div>
+
+        <div id="status-area" class="status-area">
+            <p>Enter a wallet address to search for deployed sites.</p>
+        </div>
+
+        <div id="sites-container" class="sites-grid" style="display: none;"></div>
+
+        <div class="footer">
+            <a href="https://github.com/planetai87/onchain-loader" target="_blank">OnChain Loader</a>
+            &nbsp;|&nbsp;
+            <a href="loader.html">Loader</a>
+            &nbsp;|&nbsp;
+            Data on-chain lives forever.
+        </div>
+    </div>
+
+    <script type="module">
+        import { createPublicClient, http, getAddress } from "https://esm.sh/viem@2.21.0";
+
+        // NFT Contract ABI
+        const nftAbi = [
+            {
+                name: 'nextTokenId',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [],
+                outputs: [{ type: 'uint256' }]
+            },
+            {
+                name: 'ownerOf',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [{ type: 'uint256', name: 'tokenId' }],
+                outputs: [{ type: 'address' }]
+            },
+            {
+                name: 'getLinkedSites',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [{ type: 'uint256', name: 'tokenId' }],
+                outputs: [{ type: 'address[]' }]
+            }
+        ];
+
+        // DOM Elements
+        const walletInput = document.getElementById('wallet-input');
+        const nftContractInput = document.getElementById('nft-contract-input');
+        const rpcInput = document.getElementById('rpc-input');
+        const searchBtn = document.getElementById('search-btn');
+        const statusArea = document.getElementById('status-area');
+        const sitesContainer = document.getElementById('sites-container');
+        const statsBar = document.getElementById('stats-bar');
+        const ownerAddressEl = document.getElementById('owner-address');
+        const siteCountEl = document.getElementById('site-count');
+
+        // Load from URL params
+        function loadFromParams() {
+            const params = new URLSearchParams(window.location.search);
+            const wallet = params.get('wallet') || params.get('address');
+            const nft = params.get('nft');
+            const rpc = params.get('rpc');
+
+            if (wallet) walletInput.value = wallet;
+            if (nft) nftContractInput.value = nft;
+            if (rpc) rpcInput.value = rpc;
+
+            if (wallet) {
+                searchSites();
+            }
+        }
+
+        // Show status
+        function showStatus(message, isLoading = false) {
+            if (isLoading) {
+                statusArea.innerHTML = `
+                    <div class="loading-spinner"></div>
+                    <p>${message}</p>
+                `;
+            } else {
+                statusArea.innerHTML = `<p>${message}</p>`;
+            }
+            statusArea.style.display = 'block';
+            sitesContainer.style.display = 'none';
+        }
+
+        // Show error
+        function showError(message) {
+            statusArea.innerHTML = `<p class="error-message">${message}</p>`;
+            statusArea.style.display = 'block';
+            sitesContainer.style.display = 'none';
+        }
+
+        // Show empty state
+        function showEmpty() {
+            sitesContainer.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <p class="empty-title">No deployed sites found for this wallet.</p>
+                    <p class="empty-subtitle">This wallet hasn't deployed any sites yet, or the NFT contract doesn't have linked sites.</p>
+                </div>
+            `;
+            sitesContainer.style.display = 'grid';
+            statusArea.style.display = 'none';
+        }
+
+        // Format address for display
+        function formatAddress(address) {
+            return `${address.slice(0, 6)}...${address.slice(-4)}`;
+        }
+
+        // Get viewer link
+        function getViewerLink(masterAddr) {
+            const rpcUrl = rpcInput.value.trim();
+            return `loader.html?master=${masterAddr}&rpc=${encodeURIComponent(rpcUrl)}`;
+        }
+
+        // Render sites
+        function renderSites(sites, walletAddress) {
+            if (sites.length === 0) {
+                showEmpty();
+                return;
+            }
+
+            statsBar.style.display = 'flex';
+            ownerAddressEl.textContent = formatAddress(walletAddress);
+            siteCountEl.textContent = sites.length;
+
+            sitesContainer.innerHTML = sites.map(site => `
+                <a href="${getViewerLink(site.masterAddress)}" target="_blank" class="site-card">
+                    <div class="site-token">TOKEN #${site.tokenId}</div>
+                    <div class="site-address">${site.masterAddress}</div>
+                    <div class="site-link-icon">
+                        <span>VIEW SITE</span>
+                        <span>&#8599;</span>
+                    </div>
+                </a>
+            `).join('');
+
+            sitesContainer.style.display = 'grid';
+            statusArea.style.display = 'none';
+        }
+
+        // Search sites for wallet
+        async function searchSites() {
+            const walletAddress = walletInput.value.trim();
+            const nftContractAddress = nftContractInput.value.trim();
+            const rpcUrl = rpcInput.value.trim();
+
+            if (!walletAddress) {
+                showError('Please enter a wallet address.');
+                return;
+            }
+
+            if (!walletAddress.startsWith('0x') || walletAddress.length !== 42) {
+                showError('Invalid wallet address format. Please enter a valid Ethereum address.');
+                return;
+            }
+
+            // Update URL
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('wallet', walletAddress);
+            window.history.replaceState({}, '', newUrl);
+
+            searchBtn.disabled = true;
+            showStatus('Connecting to blockchain...', true);
+
+            try {
+                const client = createPublicClient({
+                    transport: http(rpcUrl)
+                });
+
+                // Normalize wallet address for comparison
+                const targetAddress = getAddress(walletAddress);
+
+                showStatus('Fetching total token count...', true);
+
+                // Get next token ID to know how many tokens exist
+                const nextId = await client.readContract({
+                    address: nftContractAddress,
+                    abi: nftAbi,
+                    functionName: 'nextTokenId'
+                });
+
+                const totalTokens = Number(nextId) - 1;
+
+                if (totalTokens <= 0) {
+                    showEmpty();
+                    searchBtn.disabled = false;
+                    return;
+                }
+
+                showStatus(`Scanning ${totalTokens} tokens...`, true);
+
+                const sites = [];
+
+                // Check each token
+                for (let tokenId = 1; tokenId <= totalTokens; tokenId++) {
+                    showStatus(`Scanning token ${tokenId} / ${totalTokens}...`, true);
+
+                    try {
+                        // Check owner
+                        const owner = await client.readContract({
+                            address: nftContractAddress,
+                            abi: nftAbi,
+                            functionName: 'ownerOf',
+                            args: [BigInt(tokenId)]
+                        });
+
+                        // Compare addresses (case-insensitive)
+                        if (getAddress(owner) === targetAddress) {
+                            // Get linked sites for this token
+                            try {
+                                const linkedSites = await client.readContract({
+                                    address: nftContractAddress,
+                                    abi: nftAbi,
+                                    functionName: 'getLinkedSites',
+                                    args: [BigInt(tokenId)]
+                                });
+
+                                if (linkedSites && linkedSites.length > 0) {
+                                    linkedSites.forEach(siteAddress => {
+                                        sites.push({
+                                            tokenId,
+                                            masterAddress: siteAddress
+                                        });
+                                    });
+                                }
+                            } catch (e) {
+                                console.warn(`Could not fetch linked sites for token ${tokenId}:`, e);
+                            }
+                        }
+                    } catch (e) {
+                        // Token might not exist or was burned
+                        console.warn(`Could not check token ${tokenId}:`, e);
+                    }
+                }
+
+                renderSites(sites, walletAddress);
+
+            } catch (err) {
+                console.error('Search error:', err);
+                showError(`Error: ${err.message}`);
+            }
+
+            searchBtn.disabled = false;
+        }
+
+        // Event listeners
+        searchBtn.addEventListener('click', searchSites);
+        walletInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchSites();
+        });
+
+        // Initialize
+        loadFromParams();
+    </script>
+</body>
+</html>

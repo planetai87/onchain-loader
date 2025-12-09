@@ -21,6 +21,7 @@ When content is deployed to the blockchain, it becomes immutable and permanent. 
 - **Encoding Support**: Handles UTF-8 and EUC-KR encoded content
 - **Retry Logic**: Built-in retry mechanism for network reliability
 - **Simple UI**: Minimal, distraction-free loading interface
+- **OnChain Explorer**: Search and browse deployed sites by wallet address
 
 ## Quick Start
 
@@ -44,6 +45,36 @@ https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x...
 ### Live Demo
 
 - [V2 Tree Structure Demo](https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x6bA2C7509cD342137d8275d1e4506A177Ea2d0f5) - MEGA_WARREN on-chain content
+
+## OnChain Explorer
+
+Search for deployed sites by wallet address. The explorer scans the NFT contract to find all sites owned by a specific wallet.
+
+### Usage
+
+```
+https://[your-host]/dist/explorer.html?wallet=0xYOUR_WALLET_ADDRESS
+```
+
+With custom NFT contract and RPC:
+```
+https://[your-host]/dist/explorer.html?wallet=0x...&nft=0x...&rpc=https://...
+```
+
+### URL Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `wallet` | Wallet address to search for | - |
+| `nft` | NFT contract address | `0xd1591a060BB8933869b16A248C77d1375389842B` |
+| `rpc` | RPC endpoint URL | `https://timothy.megaeth.com/rpc` |
+
+### How It Works
+
+1. Enter a wallet address in the search field
+2. The explorer scans all tokens in the NFT contract
+3. For tokens owned by the wallet, it retrieves linked site addresses
+4. Click any site to open it in the OnChain Loader
 
 ## Contract Structures
 
@@ -156,6 +187,7 @@ Returns raw `Uint8Array` data without rendering. Useful for processing content p
 onchain-loader/
 ├── dist/
 │   ├── loader.html           # Universal loader (auto-detects v1/v2)
+│   ├── explorer.html         # Site explorer (search by wallet)
 │   └── onchain_loader.js     # JavaScript library
 ├── examples/
 │   ├── demo.html
