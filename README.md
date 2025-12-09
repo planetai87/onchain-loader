@@ -45,6 +45,7 @@ https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x...
 ### Live Demo
 
 - [V2 Tree Structure Demo](https://planetai87.github.io/onchain-loader/dist/loader.html?master=0x6bA2C7509cD342137d8275d1e4506A177Ea2d0f5) - MEGA_WARREN on-chain content
+- [OnChain Explorer](https://planetai87.github.io/onchain-loader/dist/explorer.html) - Search deployed sites by wallet address
 
 ## OnChain Explorer
 
